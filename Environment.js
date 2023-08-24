@@ -44,7 +44,9 @@ class Environment {
    * throws if a variable is not defined.
    */
   resolve(name) {
-    // Implement here: see Lectures 6, 7
+    if (this.record.hasOwnProperty(name)) return this;
+    else if (this.parent) return this.parent.resolve(name);
+    else throw `Variable '${name}' is not defined`;
   }
 }
 

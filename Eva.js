@@ -41,14 +41,9 @@ class Eva {
     // --------------------------------------------
     // Self-evaluating expressions:
 
-    if (this._isNumber(exp)) {
-      // Implement here: see Lecture 5
-    }
+    if (this._isNumber(exp)) return exp;
 
-    if (this._isString(exp)) {
-      // Implement here: see Lecture 5
-    }
-
+    if (this._isString(exp)) return exp.slice(1, -1);
     // --------------------------------------------
     // Block: sequence of expressions
 
@@ -61,35 +56,44 @@ class Eva {
     // Variable declaration: (var foo 10)
 
     if (exp[0] === 'var') {
-      // Implement here: see Lecture 6
+      let [_, name, value] = exp;
+      return env.define(name, this.eval(value, env));
     }
 
     // --------------------------------------------
     // Variable update: (set foo 10)
 
     if (exp[0] === 'set') {
-      // Implement here: see Lectures 6 and 15
+      let [_, name, value] = exp;
+      return env.assign(name, this.eval(value, env));
     }
 
     // --------------------------------------------
     // Variable access: foo
 
     if (this._isVariableName(exp)) {
-      // Implement here: see Lecture 6
+      return env.lookup(exp);
     }
 
     // --------------------------------------------
     // if-expression:
 
     if (exp[0] === 'if') {
-      // Implement here: see Lecture 8
+      let [_, cond, ifTrue, ifFalse] = exp;
+      if (this.eval(cond, env)) return this.eval(ifTrue, env)
+      else return this.eval(ifFalse, env);
     }
 
     // --------------------------------------------
     // while-expression:
 
     if (exp[0] === 'while') {
-      // Implement here: see Lecture 8
+      let [_, cond, body] = exp; 
+      let res;
+      while (this.eval(cond, env)) {
+        res = this.eval(body, env);
+      }
+      return res;
     }
 
     // --------------------------------------------
@@ -214,7 +218,7 @@ class Eva {
 
     if (Array.isArray(exp)) {
 
-      const fn = this.eval(exp[0], env);
+      const fn = env.lookup(exp[0]);
 
       const args = exp
         .slice(1)
@@ -249,7 +253,11 @@ class Eva {
   }
 
   _evalBlock(block, env) {
-    // Implement here: see Lecture 7
+    let res = null;
+    block.slice(1).forEach(element => {
+      res = this.eval(element, env);
+    });
+    return res;
   }
 
   _isNumber(exp) {
