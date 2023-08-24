@@ -102,7 +102,8 @@ class Eva {
     // Syntactic sugar for: (var square (lambda (x) (* x x)))
 
     if (exp[0] === 'def') {
-      // Implement here: see Lectures 11, 12
+      let [_, name, params, body] = exp;
+      return env.define(name, this.eval(['lambda', params, body], env));
     }
 
     // --------------------------------------------
@@ -163,7 +164,12 @@ class Eva {
     // Lambda function: (lambda (x) (* x x))
 
     if (exp[0] === 'lambda') {
-      // Implement here: see Lecture 12
+      let [_, params, body] = exp;
+      return {
+        params,
+        body,
+        env 
+      };
     }
 
     // --------------------------------------------
@@ -218,7 +224,7 @@ class Eva {
 
     if (Array.isArray(exp)) {
 
-      const fn = env.lookup(exp[0]);
+      const fn = this.eval(exp[0], env);
 
       const args = exp
         .slice(1)
@@ -242,7 +248,11 @@ class Eva {
   }
 
   _callUserDefinedFunction(fn, args) {
-    // Implement here: see Lecture 11
+    let activationEnv = new Environment({}, fn.env);
+    for (var i = 0; i < fn.params.length; i++) {
+      activationEnv.define(fn.params[i], args[i]);
+    }
+    return this._evalBody(fn.body, activationEnv);
   }
 
   _evalBody(body, env) {
