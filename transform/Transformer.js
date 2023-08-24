@@ -22,14 +22,35 @@ class Transformer {
    * Transforms `switch` to nested `if`-expressions.
    */
   transformSwitchToIf(switchExp) {
-    // Implement here: see Lecture 14
+    let branches = switchExp.slice(1);
+    let ifElse = [];
+    let currentIfElse = ifElse;
+
+    for (let i = 0; i < branches.length - 1; i++) {
+      let branch = branches[i];
+      let [cond, body] = branch;  
+    
+      currentIfElse.push('if', cond, body);
+      
+      let next = branches[i + 1];
+      if (next[0] === 'else') {
+        currentIfElse.push(next[1]);
+      } else {
+        let newIfElse = [];
+        currentIfElse.push(newIfElse);
+        currentIfElse = newIfElse;
+      }
+    } 
+
+    return ifElse;
   }
 
   /**
    * Transforms `for` to `while`
    */
-  transformForToWhile(forExp) {
-    // Implement here: see Lecture 14
+  transformForToWhile(exp) {
+    let [_tag, init, cond, modifier, body] = exp;
+    return ['begin', init, ['while', cond, ['begin', body, modifier]]];
   }
 
   /**
@@ -37,7 +58,7 @@ class Transformer {
    */
   transformIncToSet(incExp) {
     const [_tag, exp] = incExp;
-    return ['set', exp, ['+', exp, 1]];
+    return this._incValToSet(exp, 1);
   }
 
   /**
@@ -45,7 +66,7 @@ class Transformer {
    */
   transformDecToSet(incExp) {
     const [_tag, exp] = incExp;
-    return ['set', exp, ['-', exp, 1]];
+    return this._decValToSet(exp, 1);
   }
 
   /**
@@ -53,17 +74,28 @@ class Transformer {
    */
   transformIncValToSet(incExp) {
     const [_tag, exp, val] = incExp;
-    return ['set', exp, ['+', exp, val]];
+    return this._incValToSet(exp, val);
   }
 
   /**
-   * Transforms `+= foo val` to (set foo (+ foo val))
+   * Transforms `-= foo val` to (set foo (+ foo val))
    */
   transformDecValToSet(incExp) {
     const [_tag, exp, val] = incExp;
-    return ['set', exp, ['-', exp, val]];
+    return this._decValToSet(exp, val);
   }
 
+  _incValToSet(name, val) {
+    return this._opValToSet('+', name, val);
+  }
+
+  _decValToSet(name, val) {
+    return this._opValToSet('-', name, val);
+  }
+
+  _opValToSet(op, name, val) {
+    return ['set', name, [op, name, val]];
+  }
 }
 
 module.exports = Transformer;

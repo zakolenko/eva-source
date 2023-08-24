@@ -13,6 +13,7 @@ const Transformer = require('./transform/Transformer');
 const evaParser = require('./parser/evaParser');
 
 const fs = require('fs');
+const { dirname } = require('path');
 
 /**
  * Eva interpreter.
@@ -64,8 +65,15 @@ class Eva {
     // Variable update: (set foo 10)
 
     if (exp[0] === 'set') {
-      let [_, name, value] = exp;
-      return env.assign(name, this.eval(value, env));
+      let [_, ref, value] = exp;
+
+      if (ref[0] === 'prop') {
+        let [_, instance, name] = ref;
+        let instanceEnv = this.eval(instance, env);
+        return instanceEnv.define(name, this.eval(value, env));
+      } else {
+        return env.assign(ref, this.eval(value, env));
+      }
     }
 
     // --------------------------------------------
@@ -102,8 +110,7 @@ class Eva {
     // Syntactic sugar for: (var square (lambda (x) (* x x)))
 
     if (exp[0] === 'def') {
-      let [_, name, params, body] = exp;
-      return env.define(name, this.eval(['lambda', params, body], env));
+      return this.eval(this._transformer.transformDefToVarLambda(exp), env);
     }
 
     // --------------------------------------------
@@ -112,7 +119,7 @@ class Eva {
     // Syntactic sugar for nested if-expressions
 
     if (exp[0] === 'switch') {
-      // Implement here: see Lecture 14
+      return this.eval(this._transformer.transformSwitchToIf(exp), env);
     }
 
     // --------------------------------------------
@@ -121,7 +128,7 @@ class Eva {
     // Syntactic sugar for: (begin init (while condition (begin body modifier)))
 
     if (exp[0] === 'for') {
-      // Implement here: see Lecture 14
+      return this.eval(this._transformer.transformForToWhile(exp), env);
     }
 
     // --------------------------------------------
@@ -130,7 +137,7 @@ class Eva {
     // Syntactic sugar for: (set foo (+ foo 1))
 
     if (exp[0] === '++') {
-      // Implement here: see Lecture 14
+      return this.eval(this._transformer.transformIncToSet(exp), env);
     }
 
     // --------------------------------------------
@@ -139,7 +146,7 @@ class Eva {
     // Syntactic sugar for: (set foo (- foo 1))
 
     if (exp[0] === '--') {
-      // Implement here: see Lecture 14
+      return this.eval(this._transformer.transformDecToSet(exp), env);
     }
 
     // --------------------------------------------
@@ -148,7 +155,7 @@ class Eva {
     // Syntactic sugar for: (set foo (+ foo inc))
 
     if (exp[0] === '+=') {
-      // Implement here: see Lecture 14
+      return this.eval(this._transformer.transformIncValToSet(exp), env);
     }
 
     // --------------------------------------------
@@ -157,7 +164,7 @@ class Eva {
     // Syntactic sugar for: (set foo (- foo dec))
 
     if (exp[0] === '-=') {
-      // Implement here: see Lecture 14
+      return this.eval(this._transformer.transformDecValToSet(exp), env);
     }
 
     // --------------------------------------------
@@ -176,35 +183,49 @@ class Eva {
     // Class declaration: (class <Name> <Parent> <Body>)
 
     if (exp[0] === 'class') {
-      // Implement here: see Lecture 15
+      let [_, name, parent, body] = exp;
+      let parentEnv = this.eval(parent, env) || env;
+      let classEnv = new Environment({}, parentEnv);
+      this._evalBody(body, classEnv)
+      return env.define(name, classEnv);
     }
 
     // --------------------------------------------
     // Super expressions: (super <ClassName>)
 
     if (exp[0] === 'super') {
-      // Implement here: see Lecture 16
+      let [_, name] = exp;
+      return this.eval(name, env).parent;
     }
 
     // --------------------------------------------
     // Class instantiation: (new <Class> <Arguments>...)
 
     if (exp[0] === 'new') {
-      // Implement here: see Lecture 15
+      let classEnv = this.eval(exp[1]);
+      let objEnv = new Environment({}, classEnv);
+      let args = exp.slice(2).map(arg => this.eval(arg, env));
+      this._callUserDefinedFunction(classEnv.lookup("constructor"), [objEnv, ...args]);
+      return objEnv;
     }
 
     // --------------------------------------------
     // Property access: (prop <instance> <name>)
 
     if (exp[0] === 'prop') {
-      // Implement here: see Lecture 15
+      let [_, instance, propName] = exp;
+      let instanceEnv = this.eval(instance, env);
+      return instanceEnv.lookup(propName);
     }
 
     // --------------------------------------------
     // Module declaration: (module <name> <body>)
 
     if (exp[0] === 'module') {
-      // Implement here: see Lecture 17
+      let [_, name, body] = exp;
+      let moduleEnv = new Environment({}, env);
+      this._evalBody(body, moduleEnv);
+      return env.define(name, moduleEnv);
     }
 
     // --------------------------------------------
@@ -212,7 +233,11 @@ class Eva {
     // (import (export1, export2, ...) <name>)
 
     if (exp[0] === 'import') {
-      // Implement here: see Lecture 17
+      let [_, name] = exp;
+      
+      let moduleSrc = fs.readFileSync(`${__dirname}/modules/${name}.eva`, 'utf-8');
+      let moduleBody = evaParser.parse(`(begin ${moduleSrc})`);
+      return this.eval(['module', name, moduleBody], env);
     }
 
     // --------------------------------------------
